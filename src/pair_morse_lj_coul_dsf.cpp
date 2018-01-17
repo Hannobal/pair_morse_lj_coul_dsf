@@ -29,6 +29,7 @@
 #include "memory.h"
 #include "math_const.h"
 #include "error.h"
+#include <iostream>
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -81,7 +82,7 @@ void PairMorseLJCoulDSF::compute(int eflag, int vflag)
   int i,j,ii,jj,inum,jnum,itype,jtype;
   double qtmp,xtmp,ytmp,ztmp,delx,dely,delz,evdwl,ecoul,fpair;
   double r,rsq,r2inv,r6inv,forcecoul,forcelj,factor_coul,factor_lj;
-  double prefactor,erfcc,erfcd,t,dr,dexp;
+  double prefactor,erfcc,erfcd,t,dr,dexp,forcemorse;
   int *ilist,*jlist,*numneigh,**firstneigh;
 
   evdwl = ecoul = 0.0;
@@ -134,16 +135,20 @@ void PairMorseLJCoulDSF::compute(int eflag, int vflag)
 
       if (rsq < cutsq[itype][jtype]) {
         r2inv = 1.0/rsq;
-        
         r = sqrt(rsq);
-        dr = r - r0[itype][jtype];
-        dexp = exp(-beta[itype][jtype] * dr);
-        fpair = factor_lj * morse1[itype][jtype] * (dexp*dexp - dexp) / r;
-
+        
         if (rsq < cut_ljsq[itype][jtype]) {
+          
+          dr = r - r0[itype][jtype];
+          dexp = exp(-beta[itype][jtype] * dr);
+          forcemorse = factor_lj * morse1[itype][jtype] * (dexp*dexp - dexp) / r;
+
           r6inv = r2inv*r2inv*r2inv;
           forcelj = r6inv * (lj1[itype][jtype]*r6inv - lj2[itype][jtype]);
-        } else forcelj = 0.0;
+        } else {
+          forcelj = 0.0;
+          forcemorse = 0.0;
+        }
 
         if (rsq < cut_coulsq) {
           prefactor = qqrd2e*qtmp*q[j]/r;
@@ -155,7 +160,7 @@ void PairMorseLJCoulDSF::compute(int eflag, int vflag)
           if (factor_coul < 1.0) forcecoul -= (1.0-factor_coul)*prefactor;
         } else forcecoul = 0.0;
 
-        fpair += (forcecoul + factor_lj*forcelj) * r2inv;
+        fpair = (forcecoul + factor_lj*forcelj) * r2inv + forcemorse;
         f[i][0] += delx*fpair;
         f[i][1] += dely*fpair;
         f[i][2] += delz*fpair;
@@ -166,12 +171,12 @@ void PairMorseLJCoulDSF::compute(int eflag, int vflag)
         }
 
         if (eflag) {
-          evdwl = d0[itype][jtype] * (dexp*dexp - 2.0*dexp) -
-                  offset[itype][jtype];
           if (rsq < cut_ljsq[itype][jtype]) {
+            evdwl = d0[itype][jtype] * (dexp*dexp - 2.0*dexp) -
+                    offset[itype][jtype];
             evdwl += r6inv*(lj3[itype][jtype]*r6inv-lj4[itype][jtype]);
-          }
-          evdwl *= factor_lj;
+            evdwl *= factor_lj;
+          } else evdwl = 0.0;
 
           if (rsq < cut_coulsq) {
             ecoul = prefactor * (erfcc - r*e_shift - rsq*f_shift);
@@ -324,11 +329,13 @@ double PairMorseLJCoulDSF::init_one(int i, int j)
   morse1[i][j] = 2.0*d0[i][j]*beta[i][j];
 
   if (offset_flag) {
-    double beta_dr = -beta[i][j] * (cut_lj[i][j] - r0[i][j]);
     double ratio = sigma[i][j] / cut_lj[i][j];
-    offset[i][j] = 4.0 * epsilon[i][j] * (pow(ratio,12.0) - pow(ratio,6.0))
-                   +d0[i][j] * (exp(2.0*beta_dr) - 2.0*exp(beta_dr));
+    offset[i][j] = 4.0 * epsilon[i][j] * (pow(ratio,12.0) - pow(ratio,6.0));
+    std::cout << "offset lj: " << offset[i][j] << std::endl;
+    double beta_dr = -beta[i][j] * (cut_lj[i][j] - r0[i][j]);
+    offset[i][j] += d0[i][j] * (exp(2.0*beta_dr) - 2.0*exp(beta_dr));
   } else offset[i][j] = 0.0;
+  std::cout << "offset tot: " << offset[i][j] << std::endl;
 
   cut_ljsq[j][i] = cut_ljsq[i][j];
   lj1[j][i] = lj1[i][j];

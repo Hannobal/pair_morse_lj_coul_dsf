@@ -17,8 +17,8 @@ PairStyle(morse/lj/coul/dsf/gpu,PairMorseLJCoulDSFGPU)
 
 #else
 
-#ifndef LMP_PAIR_LJ_COUL_DSF_GPU_H
-#define LMP_PAIR_LJ_COUL_DSF_GPU_H
+#ifndef LMP_PAIR_MORSE_LJ_COUL_DSF_GPU_H
+#define LMP_PAIR_MORSE_LJ_COUL_DSF_GPU_H
 
 #include "pair_morse_lj_coul_dsf.h"
 

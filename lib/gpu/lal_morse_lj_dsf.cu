@@ -106,19 +106,24 @@ __kernel void k_morse_lj_dsf(const __global numtyp4 *restrict x_,
       int mtype=itype*lj_types+jtype;
       if (rsq<lj1[mtype].w) {
         numtyp r2inv=ucl_recip(rsq);
-        numtyp forcecoul, force_lj, force, r6inv;
+        numtyp forcecoul, force_lj, forcemorse, force, r6inv;
+        numtyp dexp, dm;
         
         r = ucl_sqrt(rsq);
-        numtyp dexp=r-mor1[mtype].z;
-        dexp=ucl_exp(-mor1[mtype].w*dexp);
-        numtyp dm=dexp*dexp-dexp;
-        force = mor1[mtype].y*dm/r*factor_lj;
 
         if (rsq < lj1[mtype].z) {
+          
+          dexp=r-mor1[mtype].z;
+          dexp=ucl_exp(-mor1[mtype].w*dexp);
+          dm=dexp*dexp-dexp;
+          forcemorse = mor1[mtype].y*dm/r*factor_lj;
+          
           r6inv = r2inv*r2inv*r2inv;
           force_lj = factor_lj*r6inv*(lj1[mtype].x*r6inv-lj1[mtype].y);
-        } else
+        } else {
           force_lj = (numtyp)0.0;
+          forcemorse = (numtyp)0.0;
+        }
 
         if (rsq < cut_coulsq) {
           fetch(prefactor,j,q_tex);
@@ -131,20 +136,20 @@ __kernel void k_morse_lj_dsf(const __global numtyp4 *restrict x_,
         } else
           forcecoul = (numtyp)0.0;
 
-        force += (force_lj + forcecoul) * r2inv;
+        force = (force_lj + forcecoul) * r2inv + forcemorse;
 
         f.x+=delx*force;
         f.y+=dely*force;
         f.z+=delz*force;
 
         if (eflag>0) {
-          numtyp e=mor2[mtype].x*(dexp*dexp - 2.0*dexp) - mor2[mtype].y;
-          energy+=e*factor_lj;
           if (rsq < cut_coulsq) {
-            e=prefactor*(erfcc-r*e_shift-rsq*f_shift-factor_coul);
+            numtyp e=prefactor*(erfcc-r*e_shift-rsq*f_shift-factor_coul);
             e_coul += e;
           }
           if (rsq < lj1[mtype].z) {
+            numtyp e=mor2[mtype].x*(dexp*dexp - 2.0*dexp) - mor2[mtype].y;
+            energy+=e*factor_lj;
             e=r6inv*(lj3[mtype].x*r6inv-lj3[mtype].y);
             energy+=factor_lj*e;
           }
@@ -247,19 +252,23 @@ __kernel void k_morse_lj_dsf_fast(const __global numtyp4 *restrict x_,
 
       if (rsq<lj1[mtype].w) {
         numtyp r2inv=ucl_recip(rsq);
-        numtyp forcecoul, force_lj, force, r6inv;
+        numtyp forcecoul, force_lj, forcemorse, force, r6inv;
+        numtyp dexp, dm;
         
         r = ucl_sqrt(rsq);
-        numtyp dexp=r-mor1[mtype].z;
-        dexp=ucl_exp(-mor1[mtype].w*dexp);
-        numtyp dm=dexp*dexp-dexp;
-        force = mor1[mtype].y*dm/r*factor_lj;
+        
         
         if (rsq < lj1[mtype].z) {
+          dexp=r-mor1[mtype].z;
+          dexp=ucl_exp(-mor1[mtype].w*dexp);
+          dm=dexp*dexp-dexp;
+          forcemorse = mor1[mtype].y*dm/r*factor_lj;
           r6inv = r2inv*r2inv*r2inv;
           force_lj = factor_lj*r6inv*(lj1[mtype].x*r6inv-lj1[mtype].y);
-        } else
+        } else {
           force_lj = (numtyp)0.0;
+          forcemorse = (numtyp)0.0;
+        }
 
         if (rsq < cut_coulsq) {
           fetch(prefactor,j,q_tex);
@@ -272,20 +281,20 @@ __kernel void k_morse_lj_dsf_fast(const __global numtyp4 *restrict x_,
         } else
           forcecoul = (numtyp)0.0;
 
-        force += (force_lj + forcecoul) * r2inv;
+        force = (force_lj + forcecoul) * r2inv + forcemorse;
 
         f.x+=delx*force;
         f.y+=dely*force;
         f.z+=delz*force;
-
+        
         if (eflag>0) {
-          numtyp e=mor2[mtype].x*(dm-dexp)-mor2[mtype].y;
-          energy+=e*factor_lj;
           if (rsq < cut_coulsq) {
-            e=prefactor*(erfcc-r*e_shift-rsq*f_shift-factor_coul);
+            numtyp e=prefactor*(erfcc-r*e_shift-rsq*f_shift-factor_coul);
             e_coul += e;
           }
           if (rsq < lj1[mtype].z) {
+            numtyp e=mor2[mtype].x*(dm-dexp)-mor2[mtype].y;
+            energy+=factor_lj*e;
             e=r6inv*(lj3[mtype].x*r6inv-lj3[mtype].y);
             energy+=factor_lj*e;
           }

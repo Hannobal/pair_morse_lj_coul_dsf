@@ -48,6 +48,8 @@ class PairMorseLJCoulDSF : public Pair {
   double **cut;
   double **d0,**beta,**r0;
   double **morse1;
+  double **a,**rho,**c;
+  double **rhoinv,**buck1,**buck2;
 
   double cut_coul,cut_coulsq;
   double alpha;
